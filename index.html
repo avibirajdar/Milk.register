@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Milk Register - Browser + Sheet Save</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; padding: 10px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; font-size: 20px; }
+        .header-actions { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #1a73e8; color: white; }
+        .small-input { width: 35px; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px; text-align: center; }
+        .name-input { width: 120px; border: none; background: transparent; font-weight: bold; color: #333; }
+        .btn { border: none; border-radius: 4px; cursor: pointer; color: white; transition: 0.3s; padding: 8px 15px; font-size: 14px; font-weight: bold;}
+        .save-btn { background-color: #28a745; }
+        .add-btn { background-color: #ff9800; font-size: 12px; padding: 5px 10px; }
+        .delete-btn { color: #e74c3c; background: transparent; font-size: 16px; cursor: pointer; border: none;}
+        .input-group { display: flex; gap: 3px; justify-content: center; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🥛 मिल्क रजिस्टर (२०२६)</h2>
+    
+    <div class="header-actions">
+        <button class="btn add-btn" onclick="addNewCustomer()">➕ Add New</button>
+        <button id="saveButton" class="btn save-btn" onclick="saveData()">💾 One-Click Save</button>
+    </div>
+    
+    <table id="milkTable">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name ✏️</th>
+                <th>Stop (4)</th>
+                <th>Extra (4)</th>
+                <th>❌</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    // तुमची वर्ड फाईलमधील नावे
+    let initialList = [
+        {code: "AMS01", name: "सिधन भेटेकर"}, {code: "AMS02", name: "अनिकेत दुध"},
+        {code: "AMS03", name: "मोठे जावन सर"}, {code: "AMS04", name: "सह्याद्री दुध"},
+        {code: "AMS05", name: "सह्याद्री मॅडम"}, {code: "AMS06", name: "दुध कस्टमर पूजा"},
+        {code: "AMS07", name: "ऑफिस"}, {code: "AMS08", name: "राजू मेकॅनिक"},
+        {code: "AMS09", name: "मोठे जाधवसर जवळ"}, {code: "AMS10", name: "दुध कस्टमर नवीन"},
+        {code: "AMS11", name: "रवी भैया बाजूचे"}, {code: "AMS12", name: "भेटेकर मॅडम"},
+        {code: "AMS13", name: "रवी भैय्या"}, {code: "AMS14", name: "पवार नगर मॅडम"},
+        {code: "AMS15", name: "भाऊ भैय्या दुध"}, {code: "AMS16", name: "गोपाळ भैया पाशी"},
+        {code: "AMS17", name: "राठोड सर"}, {code: "AMS18", name: "स्वामी वाल्याच्या"},
+        {code: "AMS19", name: "कस्टमर भादा"}, {code: "AMS20", name: "आलमला रोड १"},
+        {code: "AMS21", name: "आलमला रोड २"}, {code: "AMS22", name: "जाधव सर गल्ली"},
+        {code: "AMS23", name: "होळकर गल्ली १L"}, {code: "AMS24", name: "अमोल सर दुध"},
+        {code: "AMS25", name: "आकाश बिराजदार"}, {code: "AMS26", name: "चव्हाण कस्टमर"},
+        {code: "AMS27", name: "आकाश घरापाशी"}, {code: "AMS28", name: "कोळी कस्टमर"},
+        {code: "AMS29", name: "साळुंके कस्टमर"}, {code: "AMS30", name: "विठ्ठल मामा"},
+        {code: "AMS31", name: "राठोड सर १/२-१"}, {code: "AMS32", name: "राठोड सर १/२-२"},
+        {code: "AMS33", name: "रिक्षावाले नवीन"}, {code: "AMS34", name: "गोपाळ भैया २"},
+        {code: "AMS35", name: "महारुद्र बेडजवळगे"}, {code: "AMS36", name: "गंपू बिराजदार"},
+        {code: "AMS37", name: "बस स्टँड औसा"}, {code: "AMS38", name: "बालाजी इलेक्ट्रिक"},
+        {code: "AMS39", name: "अलमला सर वैजवाडे"}, {code: "AMS40", name: "पाटील गल्ली १"}
+    ];
+
+    let customers = [];
+    // टीप: तुमची Google Script URL खालील सिंगल कोटमध्ये टाका
+    const scriptURL = 'येथे_तुमची_URL_टाका'; 
+
+    function loadTable() {
+        // ब्राउझरमधून कस्टमर लिस्ट आणि डेटा मिळवणे
+        const storedList = JSON.parse(localStorage.getItem('cust_list'));
+        customers = storedList ? storedList : [...initialList];
+        
+        const storedData = JSON.parse(localStorage.getItem('milk_data')) || {};
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = "";
+
+        customers.forEach((cust, index) => {
+            let row = `<tr>
+                <td>${cust.code}</td>
+                <td>
+                    <input type="text" class="name-input" value="${cust.name}" onchange="updateName(${index}, this.value)">
+                </td>
+                <td>
+                    <div class="input-group">
+                        ${[1,2,3,4].map(i => `<input type="text" class="small-input" id="s-${cust.code}-${i}" value="${storedData[`s-${cust.code}-${i}`] || ''}">`).join('')}
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group">
+                        ${[1,2,3,4].map(i => `<input type="text" class="small-input" id="e-${cust.code}-${i}" value="${storedData[`e-${cust.code}-${i}`] || ''}">`).join('')}
+                    </div>
+                </td>
+                <td><button class="delete-btn" onclick="deleteCust(${index})">🗑</button></td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function updateName(index, newName) {
+        customers[index].name = newName;
+        localStorage.setItem('cust_list', JSON.stringify(customers));
+    }
+
+    function addNewCustomer() {
+        let newName = prompt("नवीन ग्राहकाचे नाव टाका:");
+        if (newName) {
+            let lastCode = customers.length > 0 ? customers[customers.length - 1].code : "AMS00";
+            let newCode = "AMS" + (parseInt(lastCode.replace("AMS", "")) + 1).toString().padStart(2, '0');
+            customers.push({code: newCode, name: newName});
+            localStorage.setItem('cust_list', JSON.stringify(customers));
+            loadTable();
+        }
+    }
+
+    function deleteCust(index) {
+        if(confirm("डिलीट करायचे?")) {
+            customers.splice(index, 1);
+            localStorage.setItem('cust_list', JSON.stringify(customers));
+            loadTable();
+        }
+    }
+
+    async function saveData() {
+        const saveBtn = document.getElementById('saveButton');
+        saveBtn.innerText = "⏳ Saving...";
+        
+        const dataToSave = {};
+        customers.forEach(cust => {
+            for(let i=1; i<=4; i++) {
+                dataToSave[`s-${cust.code}-${i}`] = document.getElementById(`s-${cust.code}-${i}`).value;
+                dataToSave[`e-${cust.code}-${i}`] = document.getElementById(`e-${cust.code}-${i}`).value;
+            }
+        });
+
+        // १. सर्वात आधी ब्राउझरमध्ये (LocalStorage) सेव्ह करा
+        localStorage.setItem('milk_data', JSON.stringify(dataToSave));
+        console.log("Browser मध्ये डेटा सेव्ह झाला.");
+
+        // २. त्यानंतर Google Sheet मध्ये पाठवण्याचा प्रयत्न करा
+        if (!scriptURL || scriptURL.includes('येथे_तुमची_URL_टाका')) {
+            alert("माहिती ब्राउझरमध्ये सेव्ह झाली आहे! (Google Sheet साठी तुमची URL कोडमध्ये पेस्ट करा)");
+            saveBtn.innerText = "💾 One-Click Save";
+            return;
+        }
+
+        try {
+            await fetch(scriptURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(dataToSave)});
+            alert("डेटा ब्राउझर आणि Google Sheet दोन्हीमध्ये सेव्ह झाला!");
+        } catch (e) { 
+            alert("ब्राउझरमध्ये सेव्ह झाले, पण Sheet Error आली!"); 
+        }
+        
+        saveBtn.innerText = "💾 One-Click Save";
+    }
+
+    window.onload = loadTable;
+</script>
+
+</body>
+</html>
