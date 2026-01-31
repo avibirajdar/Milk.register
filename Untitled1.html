@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aniket Milk App</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: #f0f2f5; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; }
+    .container { max-width: 900px; margin: auto; background: #fff; min-height: 100vh; position: relative; }
+    .hidden { display: none !important; }
+    
+    /* Header Styles */
+    h2 { color: #1a73e8; font-size: 24px; margin: 10px 0; }
+    .top { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 10; }
+    .btn { border: none; border-radius: 8px; padding: 10px 16px; font-size: 16px; cursor: pointer; transition: all 0.3s; font-weight: 600; }
+    .add-btn { background: #ff9800; color: #fff; }
+    .save-btn { background: #28a745; color: #fff; }
+    .pdf-btn { background: #17a2b8; color: #fff; }
+    .back-btn { background: #6c757d; color: #fff; }
+    .delete-btn { background: #dc3545; color: #fff; }
+    .btn:active { transform: scale(0.95); }
+    
+    /* List Styles */
+    .list-item { padding: 18px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 18px; background: #fff; transition: background 0.2s; }
+    .list-item:active { background: #e3f2fd; }
+    .dots { padding: 8px; cursor: pointer; font-size: 20px; color: #666; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+    .dots:active { background: #f0f0f0; }
+    
+    /* Notes Styles */
+    .note { background: #e8f0fe; padding: 16px; margin: 10px 12px; border-radius: 12px; position: relative; border-left: 4px solid #1a73e8; }
+    .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .note-date { font-weight: bold; color: #1a73e8; font-size: 14px; }
+    .note-text { font-size: 16px; color: #333; line-height: 1.4; }
+    .note-dots { position: absolute; top: 8px; right: 8px; padding: 4px 8px; cursor: pointer; font-size: 18px; color: #666; }
+    
+    /* Modal Overlay - Blocks all outside interaction */
+    .modal-overlay { 
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(0,0,0,0.6); z-index: 1000; display: flex; 
+      align-items: center; justify-content: center; opacity: 0; 
+      transition: opacity 0.3s; pointer-events: none; 
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+    
+    /* Modal Box */
+    .modal-box { 
+      background: #fff; border-radius: 20px; width: 90%; max-width: 400px; 
+      max-height: 80vh; overflow-y: auto; transform: scale(0.8) translateY(20px); 
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); position: relative; 
+    }
+    .modal-overlay.active .modal-box { transform: scale(1) translateY(0); }
+    
+    /* Swipe handle for modal */
+    .modal-handle { 
+      width: 40px; height: 4px; background: #ddd; border-radius: 2px; 
+      margin: 12px auto; cursor: grab; 
+    }
+    .modal-handle:active { cursor: grabbing; }
+    
+    .modal-header { padding: 20px 20px 10px; border-bottom: 2px solid #f0f0f0; }
+    .modal-title { font-size: 20px; font-weight: bold; color: #1a73e8; margin: 0; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 15px 20px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    
+    /* Form Elements */
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; font-weight: 600; }
+    .form-input { 
+      width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; 
+      font-size: 16px; transition: border-color 0.3s; font-family: inherit; 
+    }
+    .form-input:focus { outline: none; border-color: #1a73e8; }
+    textarea.form-input { resize: vertical; min-height: 80px; }
+    
+    /* Small modal for delete confirmation */
+    .modal-small { max-width: 300px; text-align: center; }
+    .modal-small .modal-body { padding: 30px 20px; }
+    .warning-icon { font-size: 48px; margin-bottom: 10px; }
+    
+    /* Date input styling */
+    input[type="date"] { font-size: 16px; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-family: inherit; }
+    
+    /* Page transitions */
+    .page { animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    
+    /* Empty state */
+    .empty-state { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- PAGE 1: Customer List -->
+  <div id="pageList" class="page">
+    <div class="top">
+      <h2>🥛 Aniket Milk Supply</h2>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn add-btn" onclick="openAddCustomerModal()">➕</button>
+        <button class="btn back-btn" onclick="history.back()">↩️</button>
+      </div>
+    </div>
+    <div id="custList"></div>
+  </div>
+
+  <!-- PAGE 2: Customer Detail -->
+  <div id="pageDetail" class="hidden page">
+    <div class="top">
+      <button class="btn back-btn" onclick="goBack()">⬅</button>
+      <div id="custTitle" style="font-size: 20px; font-weight: bold; flex: 1; text-align: center;"></div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn save-btn" onclick="saveNotes()">💾</button>
+        <button class="btn pdf-btn" onclick="exportPDF()">📄</button>
+      </div>
+    </div>
+    
+    <div style="padding: 12px; background: #f8f9fa; margin: 12px; border-radius: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <input type="date" id="noteDate">
+      <div id="todayLabel" style="font-size: 14px; font-weight: bold; color: #666;"></div>
+      <button class="btn add-btn" onclick="openAddNoteModal()" style="margin-left: auto;">➕ Note</button>
+    </div>
+    
+    <div id="notesBox"></div>
+  </div>
+
+</div>
+
+<!-- UNIVERSAL MODAL -->
+<div id="universalModal" class="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal-box" id="modalBox" onclick="event.stopPropagation()">
+    <div class="modal-handle" id="modalHandle"></div>
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Title</h3>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <!-- Dynamic content -->
+    </div>
+    <div class="modal-footer" id="modalFooter">
+      <!-- Dynamic buttons -->
+    </div>
+  </div>
+</div>
+
+<script>
+const initialList = [
+  {code:"AMS01",name:"सिधन भेटेकर"},{code:"AMS02",name:"अनिकेत दुध"},
+  {code:"AMS03",name:"मोठे जावन सर"},{code:"AMS04",name:"सह्याद्री दुध"},
+  {code:"AMS05",name:"सह्याद्री मॅडम"},{code:"AMS06",name:"दुध कस्टमर पूजा"},
+  {code:"AMS07",name:"ऑफिस"},{code:"AMS08",name:"राजू मेकॅनिक"},
+  {code:"AMS09",name:"मोठे जाधवसर जवळ"},{code:"AMS10",name:"दुध कस्टमर नवीन"},
+  {code:"AMS11",name:"रवी भैया बाजूचे"},{code:"AMS12",name:"भेटेकर मॅडम"},
+  {code:"AMS13",name:"रवी भैय्या"},{code:"AMS14",name:"पवार नगर मॅडम"},
+  {code:"AMS15",name:"भाऊ भैय्या दुध"},{code:"AMS16",name:"गोपाळ भैया पाशी"},
+  {code:"AMS17",name:"राठोड सर"},{code:"AMS18",name:"स्वामी वाल्याच्या"},
+  {code:"AMS19",name:"कस्टमर भादा"},{code:"AMS20",name:"आलमला रोड १"},
+  {code:"AMS21",name:"आलमला रोड २"},{code:"AMS22",name:"जाधव सर गल्ली"},
+  {code:"AMS23",name:"होळकर गल्ली १L"},{code:"AMS24",name:"अमोल सर दुध"},
+  {code:"AMS25",name:"आकाश बिराजदार"},{code:"AMS26",name:"चव्हाण कस्टमर"},
+  {code:"AMS27",name:"आकाश घरापाशी"},{code:"AMS28",name:"कोळी कस्टमर"},
+  {code:"AMS29",name:"साळुंके कस्टमर"},{code:"AMS30",name:"विठ्ठल मामा"},
+  {code:"AMS31",name:"राठोड सर १/२-१"},{code:"AMS32",name:"राठोड सर १/२-२"},
+  {code:"AMS33",name:"रिक्षावाले नवीन"},{code:"AMS34",name:"गोपाळ भैया २"},
+  {code:"AMS35",name:"महारुद्र बेडजवळगे"},{code:"AMS36",name:"गंपू बिराजदार"},
+  {code:"AMS37",name:"बस स्टँड औसा"},{code:"AMS38",name:"बालाजी इलेक्ट्रिक"},
+  {code:"AMS39",name:"अलमला सर वैजवाडे"},{code:"AMS40",name:"पाटील गल्ली १"}
+];
+
+let customers = JSON.parse(localStorage.getItem("cust_list")) || initialList;
+let notesData = JSON.parse(localStorage.getItem("cust_notes")) || {};
+let currentIndex = null;
+let currentNoteIndex = null;
+let modalMode = ''; // 'editCust', 'addCust', 'addNote', 'delNote'
+
+// Modal Drag/Swipe Logic
+let isDragging = false;
+let startY = 0;
+let currentY = 0;
+let modalBox = document.getElementById('modalBox');
+let modalHandle = document.getElementById('modalHandle');
+
+modalHandle.addEventListener('mousedown', startDrag);
+modalHandle.addEventListener('touchstart', startDrag, {passive: false});
+
+function startDrag(e) {
+  isDragging = true;
+  startY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+  modalBox.style.transition = 'none';
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', stopDrag);
+  document.addEventListener('touchmove', drag, {passive: false});
+  document.addEventListener('touchend', stopDrag);
+}
+
+function drag(e) {
+  if (!isDragging) return;
+  e.preventDefault();
+  currentY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+  let diff = currentY - startY;
+  if (diff > 0) { // Only allow downward drag
+    modalBox.style.transform = `translateY(${diff}px) scale(${1 - diff/1000})`;
+  }
+}
+
+function stopDrag(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  modalBox.style.transition = 'transform 0.3s';
+  let diff = currentY - startY;
+  if (diff > 100) {
+    closeModal();
+  } else {
+    modalBox.style.transform = 'scale(1) translateY(0)';
+  }
+  document.removeEventListener('mousemove', drag);
+  document.removeEventListener('mouseup', stopDrag);
+  document.removeEventListener('touchmove', drag);
+  document.removeEventListener('touchend', stopDrag);
+}
+
+function openModal() {
+  document.getElementById('universalModal').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('universalModal').classList.remove('active');
+  document.body.style.overflow = '';
+  setTimeout(() => {
+    modalBox.style.transform = '';
+  }, 300);
+}
+
+// Block outside click from closing
+function handleOverlayClick(e) {
+  // Do nothing - modal only closes via X button, Save, Delete, or swipe down
+  e.stopPropagation();
+}
+
+// Render Customer List
+function renderList() {
+  const box = document.getElementById("custList");
+  box.innerHTML = "";
+  if (customers.length === 0) {
+    box.innerHTML = '<div class="empty-state">कोणतेही कस्टमर नाहीत<br>➕ वापरून नवीन टाका</div>';
+    return;
+  }
+  customers.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "list-item";
+    d.innerHTML = `
+      <div style="flex: 1;" onclick="openCustomer(${i})">
+        <div style="font-weight: bold; color: #1a73e8;">${c.code}</div>
+        <div style="color: #333; margin-top: 4px;">${c.name}</div>
+      </div>
+      <div class="dots" onclick="openCustMenu(event, ${i})">⋮</div>
+    `;
+    box.appendChild(d);
+  });
+  localStorage.setItem("cust_list", JSON.stringify(customers));
+}
+
+// Customer Menu Modal (Edit/Delete)
+function openCustMenu(e, i) {
+  e.stopPropagation();
+  currentIndex = i;
+  modalMode = 'editCust';
+  const cust = customers[i];
+  
+  document.getElementById('modalTitle').textContent = '✏️ कस्टमर एडिट';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">AMS Code</label>
+      <input type="text" class="form-input" id="editCode" value="${cust.code}" placeholder="AMS01">
+    </div>
+    <div class="form-group">
+      <label class="form-label">कस्टमर नाव</label>
+      <input type="text" class="form-input" id="editName" value="${cust.name}" placeholder="नाव टाका">
+    </div>
+  `;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn delete-btn" onclick="deleteCust()">🗑 Delete</button>
+    <button class="btn save-btn" onclick="saveCustEdit()">💾 Save</button>
+  `;
+  openModal();
+}
+
+function saveCustEdit() {
+  const newCode = document.getElementById('editCode').value.trim();
+  const newName = document.getElementById('editName').value.trim();
+  
+  if (!newName) {
+    alert('कृपया नाव टाका!');
+    return;
+  }
+  
+  // Update notes key if code changed
+  const oldCode = customers[currentIndex].code;
+  if (oldCode !== newCode && notesData[oldCode]) {
+    notesData[newCode] = notesData[oldCode];
+    delete notesData[oldCode];
+  }
+  
+  customers[currentIndex].code = newCode || oldCode;
+  customers[currentIndex].name = newName;
+  
+  localStorage.setItem("cust_list", JSON.stringify(customers));
+  localStorage.setItem("cust_notes", JSON.stringify(notesData));
+  renderList();
+  closeModal();
+}
+
+function deleteCust() {
+  if (confirm("खात्री आहे का? हा कस्टमर कायमचा delete होईल!")) {
+    const code = customers[currentIndex].code;
+    customers.splice(currentIndex, 1);
+    delete notesData[code];
+    localStorage.setItem("cust_list", JSON.stringify(customers));
+    localStorage.setItem("cust_notes", JSON.stringify(notesData));
+    renderList();
+    closeModal();
+  }
+}
+
+// Add Customer Modal
+function openAddCustomerModal() {
+  modalMode = 'addCust';
+  document.getElementById('modalTitle').textContent = '➕ नवीन कस्टमर';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">AMS Code (ऑटो किंवा मॅनुअल)</label>
+      <input type="text" class="form-input" id="newCode" placeholder="उदा. AMS41">
+    </div>
+    <div class="form-group">
+      <label class="form-label">कस्टमर नाव *</label>
+      <input type="text" class="form-input" id="newName" placeholder="पूर्ण नाव टाका">
+    </div>
+  `;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn back-btn" onclick="closeModal()">Cancel</button>
+    <button class="btn save-btn" onclick="saveNewCust()">➕ Add</button>
+  `;
+  // Auto-generate next code
+  const nextNum = customers.length + 1;
+  document.getElementById('newCode').value = "AMS" + String(nextNum).padStart(2, "0");
+  openModal();
+}
+
+function saveNewCust() {
+  const code = document.getElementById('newCode').value.trim();
+  const name = document.getElementById('newName').value.trim();
+  
+  if (!name) {
+    alert('कृपया नाव टाका!');
+    return;
+  }
+  if (!code) {
+    alert('कृपया code टाका!');
+    return;
+  }
+  
+  // Check duplicate code
+  if (customers.find(c => c.code === code)) {
+    alert('हा code आधीपासून आहे! दुसरा वापरा.');
+    return;
+  }
+  
+  customers.push({code, name});
+  localStorage.setItem("cust_list", JSON.stringify(customers));
+  renderList();
+  closeModal();
+}
+
+// Open Customer Detail Page
+function openCustomer(i) {
+  currentIndex = i;
+  document.getElementById("todayLabel").innerText = getTodayDDMMYYYY();
+  document.getElementById("noteDate").value = new Date().toISOString().split("T")[0];
+  document.getElementById("pageList").classList.add("hidden");
+  document.getElementById("pageDetail").classList.remove("hidden");
+  document.getElementById("custTitle").innerText = customers[i].code + " - " + customers[i].name;
+  renderNotes();
+}
+
+function goBack() {
+  document.getElementById("pageDetail").classList.add("hidden");
+  document.getElementById("pageList").classList.remove("hidden");
+  currentIndex = null;
+}
+
+// Render Notes
+function renderNotes() {
+  const box = document.getElementById("notesBox");
+  box.innerHTML = "";
+  const key = customers[currentIndex].code;
+  const notes = notesData[key] || [];
+  
+  if (notes.length === 0) {
+    box.innerHTML = '<div class="empty-state">अजून कोणतीही note नाही<br>वरच्या ➕ button वापरा</div>';
+    return;
+  }
+  
+  notes.forEach((n, idx) => {
+    const d = document.createElement("div");
+    d.className = "note";
+    d.innerHTML = `
+      <div class="note-dots" onclick="openNoteMenu(event, ${idx})">⋮</div>
+      <div class="note-header">
+        <span class="note-date">📅 ${n.date}</span>
+      </div>
+      <div class="note-text">${n.text}</div>
+    `;
+    box.appendChild(d);
+  });
+}
+
+// Note Menu (Delete)
+function openNoteMenu(e, idx) {
+  e.stopPropagation();
+  currentNoteIndex = idx;
+  modalMode = 'delNote';
+  const note = notesData[customers[currentIndex].code][idx];
+  
+  document.getElementById('modalTitle').textContent = '⚠️ Note काढून टाका?';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-small">
+      <div class="warning-icon">🗑️</div>
+      <p><b>Date:</b> ${note.date}</p>
+      <p style="color: #666; margin-top: 10px;">${note.text}</p>
+      <p style="color: #dc3545; margin-top: 15px; font-size: 14px;">हे परत येणार नाही!</p>
+    </div>
+  `;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn back-btn" onclick="closeModal()">Cancel</button>
+    <button class="btn delete-btn" onclick="confirmDeleteNote()">Delete</button>
+  `;
+  openModal();
+}
+
+function confirmDeleteNote() {
+  const key = customers[currentIndex].code;
+  notesData[key].splice(currentNoteIndex, 1);
+  if (notesData[key].length === 0) delete notesData[key];
+  localStorage.setItem("cust_notes", JSON.stringify(notesData));
+  renderNotes();
+  closeModal();
+}
+
+// Add Note Modal
+function openAddNoteModal() {
+  modalMode = 'addNote';
+  const today = document.getElementById('noteDate').value;
+  const displayDate = formatDateDisplay(today);
+  
+  document.getElementById('modalTitle').textContent = '➕ नवीन Note';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="text" class="form-input" value="${displayDate}" readonly style="background: #f5f5f5;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">तपशील *</label>
+      <textarea class="form-input" id="noteText" placeholder="आज किती दूध दिले / Extra दूध / पेमेंट..."></textarea>
+    </div>
+  `;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn back-btn" onclick="closeModal()">Cancel</button>
+    <button class="btn save-btn" onclick="saveNewNote()">💾 Save</button>
+  `;
+  openModal();
+}
+
+function saveNewNote() {
+  const dateVal = document.getElementById('noteDate').value;
+  const txt = document.getElementById('noteText').value.trim();
+  
+  if (!txt) {
+    alert('कृपया तपशील लिहा!');
+    return;
+  }
+  if (!dateVal) {
+    alert('कृपया date निवडा!');
+    return;
+  }
+  
+  const displayDate = formatDateDisplay(dateVal);
+  const key = customers[currentIndex].code;
+  
+  if (!notesData[key]) notesData[key] = [];
+  notesData[key].push({date: displayDate, text: txt});
+  
+  // Sort by date (newest first)
+  notesData[key].sort((a, b) => {
+    const da = parseDate(a.date);
+    const db = parseDate(b.date);
+    return db - da;
+  });
+  
+  localStorage.setItem("cust_notes", JSON.stringify(notesData));
+  renderNotes();
+  closeModal();
+}
+
+function formatDateDisplay(dateStr) {
+  // dateStr is YYYY-MM-DD, convert to DD-MM-YYYY
+  const [yyyy, mm, dd] = dateStr.split('-');
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+function parseDate(dateStr) {
+  // dateStr is DD-MM-YYYY
+  const [dd, mm, yyyy] = dateStr.split('-');
+  return new Date(`${yyyy}-${mm}-${dd}`);
+}
+
+function getTodayDDMMYYYY() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
+function saveNotes() {
+  localStorage.setItem("cust_notes", JSON.stringify(notesData));
+  
+  // Show mini confirmation instead of alert
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.style.background = '#28a745';
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.style.background = '';
+  }, 1500);
+}
+
+function exportPDF() {
+  const element = document.getElementById("pageDetail");
+  const opt = {
+    margin: 10,
+    filename: customers[currentIndex].code + '_report.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+  html2pdf().set(opt).from(element).save();
+}
+
+// Initialize
+renderList();
+</script>
+
+</body>
+</html>
